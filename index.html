@@ -17320,6 +17320,34 @@ game.goCastelo = (area) => {
   document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || !e.target.closest?.('.pause-controls, .panel-body')) e.preventDefault(); }, { passive: false });
   let lastTouch = 0;
   document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - lastTouch < 320 && !e.target.closest?.('button')) e.preventDefault(); lastTouch = n; }, { passive: false });
+
+  // toqueRapido: no iPhone o Safari às vezes engole o "click" de um botão de menu (Continuar da pausa, X e Voltar
+  // das Configurações, opções...), principalmente logo depois de outro toque. Aqui todo botão de menu responde
+  // no fim do toque: se o dedo começou e terminou no mesmo botão sem arrastar, o click do Safari é cancelado
+  // e o botão recebe um click na hora. Arrastar (rolar uma lista) não conta como toque.
+  // Ficam de fora os botões que já respondem ao encostar o dedo: controles de toque, falas e pular cena.
+  const SKIP = '.touch, .dialog, .skip-cs, .credits-roll';
+  let tap = null;
+  document.addEventListener('touchstart', (e) => {
+    const b = e.touches.length === 1 && e.target.closest?.('button');
+    tap = b && !b.closest(SKIP) ? { b, id: e.changedTouches[0].identifier, x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY } : null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!tap) return;
+    const t = [...e.changedTouches].find((q) => q.identifier === tap.id);
+    if (t && Math.hypot(t.clientX - tap.x, t.clientY - tap.y) > 10) tap = null;
+  }, { capture: true, passive: true });
+  document.addEventListener('touchcancel', () => { tap = null; }, { capture: true });
+  document.addEventListener('touchend', (e) => {
+    const T = tap; tap = null;
+    if (!T) return;
+    const t = [...e.changedTouches].find((q) => q.identifier === T.id);
+    if (!t) return;
+    const r = T.b.getBoundingClientRect(), pad = 10;
+    if (t.clientX < r.left - pad || t.clientX > r.right + pad || t.clientY < r.top - pad || t.clientY > r.bottom + pad) return;
+    e.preventDefault();               // sem o click atrasado (ou perdido) do Safari
+    if (!T.b.disabled && T.b.isConnected && T.b.offsetParent !== null) T.b.click();
+  }, { capture: true, passive: false });
 })();
 
 // ---------- Configurações ----------
@@ -17414,25 +17442,8 @@ const panelBody = panel.querySelector('.panel-body');
 let panelBack = null;
 const panelSave = panel.querySelector('.panel-save'), panelCancel = panel.querySelector('.panel-cancel');
 let cfgSnapshot = null;          // configurações como estavam ao abrir (para Cancelar)
-// Botões de fechar o painel (X, Voltar, Salvar, Cancelar). No iPhone o Safari às vezes engole o "click"
-// logo depois de outro toque no painel; por isso no toque eles respondem direto no fim do toque (touchend),
-// e o click fica para mouse e teclado. O preventDefault no touchend impede que o click venha em dobro.
-function onPanelTap(el, fn) {
-  let t0 = null;
-  el.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; t0 = { id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
-  el.addEventListener('touchcancel', () => { t0 = null; });
-  el.addEventListener('touchend', (e) => {
-    const t = [...e.changedTouches].find((q) => t0 && q.identifier === t0.id);
-    const start = t0; t0 = null;
-    if (!t || !start) return;
-    e.preventDefault();
-    const r = el.getBoundingClientRect(), pad = 12;   // o dedo terminou em cima do botão (com uma folga)
-    if (Math.hypot(t.clientX - start.x, t.clientY - start.y) > 24) return;
-    if (t.clientX < r.left - pad || t.clientX > r.right + pad || t.clientY < r.top - pad || t.clientY > r.bottom + pad) return;
-    if (!panel.hidden) fn();
-  }, { passive: false });
-  el.addEventListener('click', () => fn());
-}
+// Botões de fechar o painel (X, Voltar, Salvar, Cancelar). No toque, quem dispara o click é o toqueRapido (lá embaixo, em lockViewport).
+function onPanelTap(el, fn) { el.addEventListener('click', () => fn()); }
 onPanelTap(panel.querySelector('.panel-back'), () => closePanel());
 panel.addEventListener('pointerdown', (e) => { if (e.target === panel) { e.preventDefault(); closePanel(); } });
 onPanelTap(panel.querySelector('.panel-x'), () => closePanel());
