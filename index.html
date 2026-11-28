@@ -2940,9 +2940,9 @@ class Hair {
     const grad = ctx.createLinearGradient(p[0].x, p[0].y, p[n - 1].x, p[n - 1].y);
     const ash = o.ash || 0;
     const mix = (c, g2) => { const a = parseInt(c.slice(1), 16), b = parseInt(g2.slice(1), 16); const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - ash) + ((b >> sh) & 255) * ash); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; };
-    grad.addColorStop(0, mix('#ffd86b', '#b8ad9c'));
-    grad.addColorStop(0.5, mix('#f5bf47', '#a39886'));
-    grad.addColorStop(1, mix('#e8a23a', '#8e8472'));
+    grad.addColorStop(0, mix('#ffd86b', '#9a6438'));
+    grad.addColorStop(0.5, mix('#f5bf47', '#7e4e2a'));
+    grad.addColorStop(1, mix('#e8a23a', '#643c20'));
     this.drawAura(ctx, mid, time, magic);
     ctx.shadowColor = `rgba(255,${206 - magic * 20},${110 - magic * 40},${Math.min(1, 0.35 + glow * 0.5 + magic * 0.4) * (1 - ash)})`;
     ctx.shadowBlur = (6 + glow * 16 + magic * 14) * (1 - ash);
@@ -3009,7 +3009,7 @@ class Hair {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     this.drawAura(ctx, p, time, magic, 0.6);
     const grad = ctx.createLinearGradient(p[0][0], p[0][1], p[n - 1][0], p[n - 1][1]);
-    grad.addColorStop(0, '#ffd86b'); grad.addColorStop(1, '#eeae3e');
+    grad.addColorStop(0, '#9a6438'); grad.addColorStop(1, '#7e4e2a');   // castanho depois do corte
     ctx.shadowColor = `rgba(255,${206 - magic * 20},${110 - magic * 40},${Math.min(1, 0.25 + glow * 0.4 + magic * 0.35)})`;
     ctx.shadowBlur = 4 + glow * 10 + magic * 10;
     ctx.fillStyle = grad;
@@ -3029,12 +3029,12 @@ class Hair {
     ctx.shadowBlur = 0;
     // mechas: luz por cima, sombra por baixo e a curva da ponta virada para dentro
     ctx.lineWidth = 1.1;
-    ctx.strokeStyle = 'rgba(255,244,200,0.75)';
+    ctx.strokeStyle = 'rgba(200,150,100,0.7)';
     ctx.beginPath(); smoothPath(ctx, p.map(([x, y], i) => [x + (left[i][0] - x) * 0.45, y + (left[i][1] - y) * 0.45])); ctx.stroke();
-    ctx.strokeStyle = 'rgba(190,120,30,0.55)';
+    ctx.strokeStyle = 'rgba(80,45,20,0.55)';
     ctx.beginPath(); smoothPath(ctx, p.map(([x, y], i) => [x + (right[i][0] - x) * 0.5, y + (right[i][1] - y) * 0.5])); ctx.stroke();
     if (k > 0.6) {
-      ctx.strokeStyle = `rgba(200,130,40,${(k - 0.6) * 1.2})`;
+      ctx.strokeStyle = `rgba(90,52,24,${(k - 0.6) * 1.2})`;
       ctx.beginPath();
       ctx.moveTo(end[0] + enx * wl * 0.8 - ux * 3, end[1] + eny * wl * 0.8 - uy * 3);
       ctx.quadraticCurveTo(end[0] + ux * 3.5, end[1] + uy * 3.5, end[0] - enx * wl * 0.8 - ux * 3, end[1] - eny * wl * 0.8 - uy * 3);
@@ -3484,16 +3484,18 @@ function drawMusgo(ctx, x, y, p, t) {
 }
 
 function drawHead(ctx, x, y, p, t) {
+  // depois do corte o cabelo fica castanho (a franja e o topo da cabeça também)
+  const HC = p.hair?.short ? { hair: '#8a5730', hairDark: '#6e4224', hairLight: '#b07c4c' } : C;
   // cabelo de trás
-  ctx.fillStyle = C.hairDark;
+  ctx.fillStyle = HC.hairDark;
   ctx.beginPath(); ctx.ellipse(x - 3, y + 0.5, 11, 11.5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = C.hair;
+  ctx.fillStyle = HC.hair;
   ctx.beginPath(); ctx.ellipse(x - 2, y - 1, 11, 11, 0, 0, Math.PI * 2); ctx.fill();
   // rosto
   ctx.fillStyle = C.skin;
   ctx.beginPath(); ctx.ellipse(x + 2.6, y + 2, 8.6, 9, 0, 0, Math.PI * 2); ctx.fill();
   // franja
-  ctx.fillStyle = C.hair;
+  ctx.fillStyle = HC.hair;
   ctx.beginPath();
   ctx.moveTo(x - 7, y - 4);
   ctx.quadraticCurveTo(x + 2, y - 15, x + 11.5, y - 3.5);
@@ -3501,7 +3503,7 @@ function drawHead(ctx, x, y, p, t) {
   ctx.quadraticCurveTo(x + 3.5, y - 6, x + 0, y - 3);
   ctx.quadraticCurveTo(x - 3, y - 5, x - 7, y - 4);
   ctx.fill();
-  ctx.strokeStyle = C.hairLight; ctx.lineWidth = 1;
+  ctx.strokeStyle = HC.hairLight; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(x - 1, y - 2, 8.5, -2.6, -1.4); ctx.stroke();
 
   // olho: de perfil só aparece UM olho, como em todos os outros personagens do jogo.
@@ -11037,6 +11039,7 @@ class Castelo extends Area {
       { cam: { x: null } },
     ], () => {
       this.memory = 0; this.memoryOut = false;
+      q.hidden = true;   // a Rainha volta para baixo, para junto do Rei (não fica uma segunda Rainha no berçário)
       Quests.complete(g, 'lembranca');
       g.state.set('origem-lembranca');
       g.audio?.music('castelo');
@@ -13094,7 +13097,7 @@ const CX = {
       N('Um som seco, frio. O peso que a Lira carregou a vida inteira some de uma vez.'),
     ],
     apaga: [
-      N('Na mão do Aldo, a mecha comprida perde o brilho. O dourado escorre dela e fica cinza, como cinza de lareira.'),
+      N('Na mão do Aldo, a mecha comprida perde o brilho. O dourado escorre dela e fica castanho, como os meus cabelos de agora.'),
       AL('Não... não, não. Por que ela está apagando?'),
     ],
     reacao: [
@@ -13107,7 +13110,7 @@ const CX = {
       L('A luz nunca esteve nas pontas, Aldo. Ela fica com quem divide. Nunca com quem pega.'),
     ],
     solta: [
-      N('A mecha cinza se desfaz em brilhos entre os dedos do Aldo. Os brilhos sobem e vão juntar-se à luz do disco.'),
+      N('A mecha castanha se desfaz em brilhos entre os dedos do Aldo. Os brilhos sobem e vão juntar-se à luz do disco.'),
       AL('Eu passei a vida inteira tentando guardar a luz. E ela foge de mão fechada.'),
       N('O caco de ferro-frio cai no chão do terraço. O Aldo não se mexe mais.'),
     ],
@@ -14469,8 +14472,8 @@ class Santuario extends Area {
       ctx.fillStyle = '#7a6a84'; ctx.fillRect(S.gap.x0, G, S.gap.x1 - S.gap.x0, 12); ctx.fillStyle = '#8a7a90'; ctx.fillRect(S.gap.x0, G, S.gap.x1 - S.gap.x0, 3);
       ctx.strokeStyle = 'rgba(30,20,40,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(S.gap.x0 + 20, G + 3); ctx.lineTo(S.gap.x0 + 120, G + 8); ctx.lineTo(S.gap.x0 + 200, G + 2); ctx.stroke();
     }
-    // Aldo pendurado na beira
-    if (f === 'resgate') {
+    // Aldo pendurado na beira (some quando ele é salvo, para não ficar dois Aldos)
+    if (f === 'resgate' && !this.game.state.flag('aldo-salvo') && !this.game.state.flag('aldo-caio')) {
       const hx = W - 62, hy = S.dais.top, sway = Math.sin(t * 3) * 3;
       ctx.save(); ctx.translate(hx + 8 + sway, hy);
       ctx.strokeStyle = '#e8c0a0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(-2, 24); ctx.moveTo(4, 2); ctx.lineTo(2, 24); ctx.stroke();
@@ -16148,7 +16151,7 @@ const P = __m["js/game/render/props.js"];
 
 DIARIO.push({ group: 'Depois da luz', items: [
   { id: 'retorno', title: 'A volta para casa', text: 'Desci a montanha com o Caio ao amanhecer. Valdouro inteira estava acordada, com todas as lanternas acesas.', has: (s) => s.flag('epilogo') },
-  { id: 'corte', title: 'O cabelo curto', text: 'No Terraço do Primeiro Sol, o Aldo cortou os meus cabelos com um caco da gaiola. Na mão dele, a mecha ficou cinza. Em mim ficou uma luz pequena, na altura do ombro. A luz fica com quem divide.', has: (s) => s.flag('cabelo-curto') },
+  { id: 'corte', title: 'O cabelo curto', text: 'No Terraço do Primeiro Sol, o Aldo cortou os meus cabelos com um caco da gaiola. Na mão dele, a mecha ficou castanha. Em mim ficou uma luz pequena, na altura do ombro. A luz fica com quem divide.', has: (s) => s.flag('cabelo-curto') },
   { id: 'corda', title: 'A corda do Caio', text: 'Sem cabelo comprido para laçar, o Caio me deu a corda de gancho dele. Ela sobe nas argolas e balança nos galhos como os meus cabelos faziam.', has: (s) => s.flag('corda') },
   { id: 'paiMae', title: 'Mãe e pai', text: 'A Rainha Celina e o Rei Dimas vieram a pé, sem coroa. A minha mãe me reconheceu pelo cabelo curto: era assim quando eu nasci. Eu chamei os dois de mãe e pai pela primeira vez.', has: (s) => s.flag('epilogo') },
   { id: 'cancao', title: 'A canção do berçário', text: 'A minha mãe cantou a canção da caixinha de música no meio da praça, e eu cantei a segunda parte junto. Eu nunca tinha esquecido.', has: (s) => s.flag('epilogo') },
