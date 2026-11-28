@@ -2307,6 +2307,40 @@ const Mysteries = {
         after?.(ar, n);
         if (this.step(g, 'vestigios') === 2) { Quests.complete(g, 'vestigios'); this.startNext(g, 'segredos'); }
       };
+      // "Conte tudo ao Caio": ele precisa estar na praça (quem chegou aqui pelas minas, antes de conhecer o Caio
+      // nos telhados, não o encontrava) e ganha um marcador: "!" e uma seta em cima dele, e uma seta na borda
+      // da tela apontando para o lado dele quando ele está fora de vista.
+      (a.extraFront ||= []).push((ctx) => {
+        const on = this.step(g, 'vestigios') === 2;
+        if (!on) { if (caio.questMark === '!' && caio.vestigiosMark) { caio.questMark = null; caio.vestigiosMark = false; } return; }
+        if (caio.hidden && !caio.scripted && a.placeCaio) a.placeCaio();
+        if (caio.hidden || g.ui.dialogOpen) return;
+        caio.questMark = '!'; caio.vestigiosMark = true;
+        const cam = g.camera, t = a.t || 0;
+        const cx = caio.x, headY = caio.y - 112 * (caio.scale || 1);
+        ctx.save();
+        ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = '#1c1630'; ctx.lineWidth = 2;
+        if (cx > cam.left + 30 && cx < cam.right - 30) {
+          // seta dourada balançando em cima do Caio
+          const y = headY + Math.sin(t * 5) * 4;
+          ctx.beginPath(); ctx.moveTo(cx - 9, y - 12); ctx.lineTo(cx + 9, y - 12); ctx.lineTo(cx, y); ctx.closePath();
+          ctx.stroke(); ctx.fill();
+        } else {
+          // fora da tela: seta na borda, do lado em que ele está, com o nome
+          const right = cx > cam.right - 30, z = cam.zoom || 1;
+          const ex = right ? cam.right - 34 / z : cam.left + 34 / z;
+          const ey = Math.max(cam.top + 60 / z, Math.min(cam.bottom - 90 / z, a.player.cy - 30));
+          const pulse = 1 + Math.sin(t * 6) * 0.08, d = right ? 1 : -1;
+          ctx.translate(ex, ey); ctx.scale(pulse / z, pulse / z);
+          ctx.fillStyle = 'rgba(28,22,48,0.85)'; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#f2c14e'; ctx.stroke();
+          ctx.fillStyle = '#f2c14e';
+          ctx.beginPath(); ctx.moveTo(10 * d, 0); ctx.lineTo(-5 * d, -9); ctx.lineTo(-5 * d, 9); ctx.closePath(); ctx.fill();
+          ctx.font = '800 12px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillStyle = '#1c1630'; ctx.fillText('Caio', 1, 25); ctx.fillStyle = '#ffe6a0'; ctx.fillText('Caio', 0, 24);
+        }
+        ctx.restore();
+      });
     }
     const bastiao = this.npcOf(a, 'bastiao');
     if (bastiao) { const orig = bastiao.talk; bastiao.talk = (ar, n) => (s.flag('verdade') ? MS.bastiaoDepois : (typeof orig === 'function' ? orig(ar, n) : orig)); }
@@ -10575,6 +10609,8 @@ class Castelo extends Area {
     this.solid(ROOM_A.x1, CEIL, ROOM_B.x0 - ROOM_A.x1, UP - CEIL); // parede entre os quartos
     if (!this.getS('passagem', false)) this.secretWall = this.solid(SECRET.x1, CEIL, LIB.x0 - SECRET.x1, UP - CEIL, { id: 'estante' });
     if (!this.getS('cisnes', false)) this.hedgeGate = this.solid(2560, 1050, 30, 150, { id: 'sebe' });
+    // degraus baixos dos dois lados da sebe: dá para pular por cima dela e seguir para o castelo antes do enigma dos cisnes
+    if (!this.getS('cisnes', false)) this.hedgeSteps = [this.solid(2510, 1110, 40, 90, { id: 'degrau-sebe-a' }), this.solid(2600, 1110, 40, 90, { id: 'degrau-sebe-b' })];
 
     // ---------- plataformas e magia ----------
     // jardins: pérgola
@@ -10810,6 +10846,7 @@ class Castelo extends Area {
   // ---------- objetos ----------
   buildObjects() {
     const g = this.game;
+    const area = this;
     const obj = (id, x, y, w, h, label, use, extra = {}) => this.object({ id, x, y, w, h, label, use: typeof use === 'function' ? use : () => this.say(use), ...extra });
     obj('sair', 70, G - 120, 110, 120, 'Voltar para a cidade', () => this.say(CT.voltar, () => g.scenes.go('reino', { spawn: 'castelo' })));
     obj('fonteObj', 1060, G - 90, 120, 90, 'Fonte dos cisnes', () => this.say(this.getS('fonte', false) ? CT.fonteViva : CT.fonteSeca), { get hidden() { return false; } });
@@ -10818,7 +10855,7 @@ class Castelo extends Area {
     obj('pergolaObj', 2200, 1030 - 40, 120, 40, 'Olhar o castelo', CT.pergola, { zone: { x0: 2190, x1: 2330, y0: 1024, y1: 1034 } });
     this.object({
       id: 'bauJardim', x: 2630, y: G - 40, w: 60, h: 40, label: 'Abrir o baú',
-      get hidden() { return false; },
+      get hidden() { return !area.getS('cisnes', false); },
       use: () => {
         if (this.getS('bauJardim', false)) { this.say(CT.jardimSecreto); return; }
         this.setS('bauJardim', true);
@@ -10911,6 +10948,7 @@ class Castelo extends Area {
     if (SWANS.every((_, k) => this.getS('cisne' + k, k) === 3)) {
       this.setS('cisnes', true);
       const s = this.hedgeGate; if (s) this.solids = this.solids.filter((x) => x !== s);
+      if (this.hedgeSteps) this.solids = this.solids.filter((x) => !this.hedgeSteps.includes(x));
       this.hedgeK = 0;
       Quests.step(g, 'cisnes', 1);
       g.camera.shake(2, 0.25);
@@ -11163,6 +11201,7 @@ class Castelo extends Area {
     if (on(1650, 2100)) { pond(ctx, t); SWANS.forEach((x, i) => swan(ctx, x, G - 8, this.getS('cisne' + i, i), this.swanTurn?.i === i ? this.swanTurn.t : 1, this.getS('cisnes', false))); }
     // sebe do jardim escondido
     if (on(2540, 2760)) secretGarden(ctx, this.getS('cisnes', false) ? (this.hedgeK ?? 1) : 0, this.getS('bauJardim', false));
+    if (on(2500, 2650) && !this.getS('cisnes', false)) for (const x of [2508, 2598]) { ctx.fillStyle = '#4c7d47'; roundRect(ctx, x, 1108, 44, 92, 12); ctx.fill(); ctx.fillStyle = '#5f9257'; roundRect(ctx, x + 4, 1110, 36, 10, 5); ctx.fill(); }
     // grande vitral
     if (on(3300, 3500)) bigWindow(ctx, this.getS('vitral', false) ? (this.vitralK ?? 1) : 0, FRAGS.length, t);
     // lustres
